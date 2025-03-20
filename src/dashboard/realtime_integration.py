@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime
 import threading
 import time
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -34,6 +35,7 @@ class RealTimeIntegration:
         self.streaming_symbols = []
         self.data_callbacks = {}
         self.last_update = {}
+        self.debug_mode = True  # Enable debug mode for troubleshooting
     
     def register_callback(self, data_type, callback):
         """
@@ -55,6 +57,8 @@ class RealTimeIntegration:
             return True
         except Exception as e:
             logger.error(f"Error registering callback for {data_type} data: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
             return False
     
     def handle_quote_update(self, message):
@@ -65,8 +69,18 @@ class RealTimeIntegration:
             message: Quote message from the stream
         """
         try:
+            if self.debug_mode:
+                logger.info(f"Processing quote update: {json.dumps(message, indent=2)}")
+                
             # Process the message and extract relevant data
             symbol = message.get('symbol', 'UNKNOWN')
+            
+            if symbol == 'UNKNOWN' and 'key' in message:
+                symbol = message['key']
+                
+            if symbol == 'UNKNOWN':
+                logger.warning(f"Quote update missing symbol: {message}")
+                return
             
             # Update last update time
             self.last_update[symbol] = datetime.now()
@@ -79,6 +93,9 @@ class RealTimeIntegration:
             logger.debug(f"Processed quote update for {symbol}")
         except Exception as e:
             logger.error(f"Error handling quote update: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                logger.error(f"Message that caused error: {message}")
     
     def handle_option_update(self, message):
         """
@@ -88,8 +105,27 @@ class RealTimeIntegration:
             message: Option message from the stream
         """
         try:
+            if self.debug_mode:
+                logger.info(f"Processing option update: {json.dumps(message, indent=2)}")
+                
             # Process the message and extract relevant data
             symbol = message.get('symbol', 'UNKNOWN')
+            underlying = message.get('underlying', 'UNKNOWN')
+            
+            if symbol == 'UNKNOWN' and 'key' in message:
+                symbol = message['key']
+                
+            if symbol == 'UNKNOWN':
+                logger.warning(f"Option update missing symbol: {message}")
+                return
+                
+            if underlying == 'UNKNOWN':
+                # Try to extract underlying from option symbol
+                parts = symbol.split('_')
+                if len(parts) > 0:
+                    underlying = parts[0]
+                else:
+                    logger.warning(f"Could not determine underlying for option {symbol}")
             
             # Update last update time
             self.last_update[symbol] = datetime.now()
@@ -102,6 +138,9 @@ class RealTimeIntegration:
             logger.debug(f"Processed option update for {symbol}")
         except Exception as e:
             logger.error(f"Error handling option update: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                logger.error(f"Message that caused error: {message}")
     
     def start_streaming(self, symbols, fields=None):
         """
@@ -124,17 +163,35 @@ class RealTimeIntegration:
             # Define the message handler
             def message_handler(message):
                 try:
+                    if self.debug_mode:
+                        logger.info(f"Received message: {json.dumps(message, indent=2)}")
+                        
                     # Determine message type and route to appropriate handler
-                    if 'content' in message and isinstance(message['content'], list):
-                        for content_item in message['content']:
-                            if 'QUOTE' in content_item.get('service', ''):
-                                self.handle_quote_update(content_item)
-                            elif 'OPTION' in content_item.get('service', ''):
-                                self.handle_option_update(content_item)
+                    if isinstance(message, dict):
+                        # Check for Schwab API specific message structure
+                        if 'data' in message:
+                            data = message['data']
+                            if isinstance(data, list):
+                                for item in data:
+                                    self._process_data_item(item)
+                            else:
+                                self._process_data_item(data)
+                        elif 'content' in message and isinstance(message['content'], list):
+                            for content_item in message['content']:
+                                if 'service' in content_item:
+                                    service = content_item.get('service', '')
+                                    if 'QUOTE' in service:
+                                        self.handle_quote_update(content_item)
+                                    elif 'OPTION' in service:
+                                        self.handle_option_update(content_item)
+                        else:
+                            logger.debug(f"Unrecognized message format: {message}")
                     else:
-                        logger.debug(f"Received message: {message}")
+                        logger.debug(f"Received non-dict message: {message}")
                 except Exception as e:
                     logger.error(f"Error in message handler: {str(e)}")
+                    if self.debug_mode:
+                        logger.error(f"Traceback: {traceback.format_exc()}")
             
             # Start streaming with the data manager
             success = self.data_manager.realtime_data.start_streaming(
@@ -160,7 +217,32 @@ class RealTimeIntegration:
                 return False
         except Exception as e:
             logger.error(f"Error starting real-time streaming: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
             return False
+    
+    def _process_data_item(self, item):
+        """
+        Process a data item from the stream.
+        
+        Args:
+            item: Data item from the stream
+        """
+        try:
+            if 'service' in item:
+                service = item['service']
+                if 'QUOTE' in service:
+                    self.handle_quote_update(item)
+                elif 'OPTION' in service:
+                    self.handle_option_update(item)
+                else:
+                    logger.debug(f"Unhandled service type: {service}")
+            else:
+                logger.debug(f"Data item missing service field: {item}")
+        except Exception as e:
+            logger.error(f"Error processing data item: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
     
     def stop_streaming(self):
         """
@@ -189,6 +271,8 @@ class RealTimeIntegration:
                 return False
         except Exception as e:
             logger.error(f"Error stopping real-time streaming: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
             return False
     
     def _monitor_streaming(self):
@@ -201,6 +285,7 @@ class RealTimeIntegration:
                 current_time = datetime.now()
                 for symbol in self.streaming_symbols:
                     if symbol not in self.last_update:
+                        logger.warning(f"No updates received yet for {symbol}")
                         continue
                     
                     last_update_time = self.last_update.get(symbol)
@@ -220,6 +305,8 @@ class RealTimeIntegration:
                 time.sleep(self.update_interval)
             except Exception as e:
                 logger.error(f"Error in streaming monitor: {str(e)}")
+                if self.debug_mode:
+                    logger.error(f"Traceback: {traceback.format_exc()}")
                 time.sleep(self.update_interval)
     
     def get_streaming_status(self):

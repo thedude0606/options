@@ -14,6 +14,12 @@
 - **Alternatives Considered**: Unified data retrieval system
 - **Consequences**: More modular code structure, easier to maintain and extend
 
+### Real-time Data Handling
+- **Decision**: Implement robust error handling and debug mode in real-time components
+- **Rationale**: Improves reliability and makes troubleshooting easier when data flow issues occur
+- **Alternatives Considered**: Simpler implementation with less error handling
+- **Consequences**: More complex code but significantly improved reliability and easier debugging
+
 ## Technology Selections
 
 ### Backend
@@ -50,3 +56,17 @@
 - **Decision**: Use factory pattern for creating data retrieval components
 - **Rationale**: Provides flexibility in creating different types of data retrievers
 - **Consequences**: More extensible code, easier to add new data types
+
+## Implementation Decisions
+
+### Message Parsing Strategy
+- **Decision**: Implement flexible message parsing to handle different Schwab API response formats
+- **Rationale**: The Schwab API can return data in different formats depending on the context
+- **Alternatives Considered**: Strict parsing expecting a single format
+- **Consequences**: More resilient to API changes and variations in response format
+
+### Logging and Debugging
+- **Decision**: Add comprehensive logging and debug mode to real-time components
+- **Rationale**: Makes it easier to identify and fix issues with data flow
+- **Alternatives Considered**: Minimal logging with console output
+- **Consequences**: Better visibility into system behavior, easier troubleshooting

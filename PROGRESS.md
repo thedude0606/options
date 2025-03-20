@@ -34,6 +34,9 @@
 - Added real-time updates to charts and tables
 - Implemented streaming connection management and monitoring
 - Added toggle functionality for real-time updates
+- Fixed real-time data flow issues with improved message handling and error reporting
+- Added debug mode to help diagnose streaming data issues
+- Enhanced message parsing to handle different Schwab API response formats
 
 ### Testing
 - Created comprehensive test suite for application components
@@ -50,6 +53,7 @@
 - Authentication requires Python 3.11+ due to Schwabdev library requirements
 - Real authentication requires browser interaction for OAuth flow
 - Mock tests are used for CI/CD environments where authentication isn't possible
+- ~~Data doesn't appear in dashboard despite successful authentication~~ (Fixed)
 
 ## Next Steps
 - Add additional data filtering options

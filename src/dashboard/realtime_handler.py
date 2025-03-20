@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime
 import plotly.graph_objs as go
 from dash import html
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -32,6 +33,7 @@ class RealTimeHandler:
         self.price_data = {}
         self.volume_data = {}
         self.option_data = {}
+        self.debug_mode = True  # Enable debug mode for troubleshooting
         
         # Register callbacks with the real-time integration
         self._register_callbacks()
@@ -40,8 +42,11 @@ class RealTimeHandler:
         """
         Register callbacks with the real-time integration.
         """
-        self.realtime.register_callback('QUOTE', self.handle_quote_update)
-        self.realtime.register_callback('OPTION', self.handle_option_update)
+        success1 = self.realtime.register_callback('QUOTE', self.handle_quote_update)
+        success2 = self.realtime.register_callback('OPTION', self.handle_option_update)
+        
+        if not success1 or not success2:
+            logger.error("Failed to register one or more callbacks with real-time integration")
     
     def handle_quote_update(self, message):
         """
@@ -51,12 +56,20 @@ class RealTimeHandler:
             message: Quote message from the stream
         """
         try:
+            if self.debug_mode:
+                logger.info(f"Handling quote update: {json.dumps(message, indent=2)}")
+            
             # Extract data from message
             symbol = message.get('symbol', 'UNKNOWN')
+            
+            if symbol == 'UNKNOWN':
+                logger.warning(f"Quote update missing symbol: {message}")
+                return
             
             # Update price data
             if symbol not in self.price_data:
                 self.price_data[symbol] = []
+                logger.info(f"Created new price data series for {symbol}")
             
             timestamp = datetime.now()
             price_point = {
@@ -77,6 +90,7 @@ class RealTimeHandler:
             # Update volume data
             if symbol not in self.volume_data:
                 self.volume_data[symbol] = []
+                logger.info(f"Created new volume data series for {symbol}")
             
             volume_point = {
                 'datetime': timestamp,
@@ -90,8 +104,15 @@ class RealTimeHandler:
                 self.volume_data[symbol] = self.volume_data[symbol][-1000:]
             
             logger.debug(f"Updated real-time data for {symbol}")
+            
+            # Log data point count for debugging
+            if self.debug_mode and len(self.price_data[symbol]) % 10 == 0:
+                logger.info(f"Symbol {symbol} now has {len(self.price_data[symbol])} price points and {len(self.volume_data[symbol])} volume points")
         except Exception as e:
             logger.error(f"Error handling quote update: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                logger.error(f"Message that caused error: {message}")
     
     def handle_option_update(self, message):
         """
@@ -101,13 +122,29 @@ class RealTimeHandler:
             message: Option message from the stream
         """
         try:
+            if self.debug_mode:
+                logger.info(f"Handling option update: {json.dumps(message, indent=2)}")
+            
             # Extract data from message
             symbol = message.get('symbol', 'UNKNOWN')
             underlying = message.get('underlying', 'UNKNOWN')
             
+            if symbol == 'UNKNOWN':
+                logger.warning(f"Option update missing symbol: {message}")
+                return
+                
+            if underlying == 'UNKNOWN':
+                # Try to extract underlying from option symbol
+                parts = symbol.split('_')
+                if len(parts) > 0:
+                    underlying = parts[0]
+                else:
+                    logger.warning(f"Could not determine underlying for option {symbol}")
+            
             # Update option data
             if underlying not in self.option_data:
                 self.option_data[underlying] = {}
+                logger.info(f"Created new option data series for underlying {underlying}")
             
             self.option_data[underlying][symbol] = {
                 'timestamp': datetime.now(),
@@ -126,8 +163,16 @@ class RealTimeHandler:
             }
             
             logger.debug(f"Updated real-time option data for {symbol}")
+            
+            # Log option count for debugging
+            if self.debug_mode:
+                option_count = len(self.option_data.get(underlying, {}))
+                logger.info(f"Underlying {underlying} now has {option_count} options")
         except Exception as e:
             logger.error(f"Error handling option update: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                logger.error(f"Message that caused error: {message}")
     
     def get_real_time_price_figure(self, symbols=None):
         """
@@ -140,14 +185,18 @@ class RealTimeHandler:
             dict: Plotly figure object
         """
         try:
+            if self.debug_mode:
+                logger.info(f"Creating real-time price figure for symbols: {symbols}")
+                
             if not symbols:
                 symbols = list(self.price_data.keys())
             
             if not symbols:
+                logger.warning("No symbols available for real-time price figure")
                 return {
                     "data": [],
                     "layout": {
-                        "title": "Real-time Price Chart",
+                        "title": "Real-time Price Chart (No Data Available)",
                         "xaxis": {"title": "Time"},
                         "yaxis": {"title": "Price ($)"}
                     }
@@ -157,10 +206,22 @@ class RealTimeHandler:
             traces = []
             for symbol in symbols:
                 if symbol not in self.price_data or not self.price_data[symbol]:
+                    logger.warning(f"No price data available for symbol {symbol}")
                     continue
                 
                 # Convert to DataFrame
                 df = pd.DataFrame(self.price_data[symbol])
+                
+                if df.empty:
+                    logger.warning(f"Empty DataFrame for symbol {symbol}")
+                    continue
+                
+                # Log data for debugging
+                if self.debug_mode:
+                    logger.info(f"Price data for {symbol}: {len(df)} points")
+                    if not df.empty:
+                        logger.info(f"First point: {df.iloc[0].to_dict()}")
+                        logger.info(f"Last point: {df.iloc[-1].to_dict()}")
                 
                 traces.append(go.Scatter(
                     x=df['datetime'],
@@ -183,6 +244,8 @@ class RealTimeHandler:
             return figure
         except Exception as e:
             logger.error(f"Error creating real-time price figure: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 "data": [],
                 "layout": {
@@ -203,14 +266,18 @@ class RealTimeHandler:
             dict: Plotly figure object
         """
         try:
+            if self.debug_mode:
+                logger.info(f"Creating real-time volume figure for symbols: {symbols}")
+                
             if not symbols:
                 symbols = list(self.volume_data.keys())
             
             if not symbols:
+                logger.warning("No symbols available for real-time volume figure")
                 return {
                     "data": [],
                     "layout": {
-                        "title": "Real-time Volume Chart",
+                        "title": "Real-time Volume Chart (No Data Available)",
                         "xaxis": {"title": "Time"},
                         "yaxis": {"title": "Volume"}
                     }
@@ -220,10 +287,22 @@ class RealTimeHandler:
             traces = []
             for symbol in symbols:
                 if symbol not in self.volume_data or not self.volume_data[symbol]:
+                    logger.warning(f"No volume data available for symbol {symbol}")
                     continue
                 
                 # Convert to DataFrame
                 df = pd.DataFrame(self.volume_data[symbol])
+                
+                if df.empty:
+                    logger.warning(f"Empty DataFrame for symbol {symbol}")
+                    continue
+                
+                # Log data for debugging
+                if self.debug_mode:
+                    logger.info(f"Volume data for {symbol}: {len(df)} points")
+                    if not df.empty:
+                        logger.info(f"First point: {df.iloc[0].to_dict()}")
+                        logger.info(f"Last point: {df.iloc[-1].to_dict()}")
                 
                 traces.append(go.Bar(
                     x=df['datetime'],
@@ -245,6 +324,8 @@ class RealTimeHandler:
             return figure
         except Exception as e:
             logger.error(f"Error creating real-time volume figure: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 "data": [],
                 "layout": {
@@ -266,11 +347,22 @@ class RealTimeHandler:
             html.Table: Formatted table for display
         """
         try:
+            if self.debug_mode:
+                logger.info(f"Creating real-time option table for symbol {symbol}, type {option_type}")
+                
             if symbol not in self.option_data or not self.option_data[symbol]:
-                return html.Div("No real-time option data available")
+                logger.warning(f"No option data available for symbol {symbol}")
+                return html.Div(f"No real-time option data available for {symbol}")
             
             # Extract options
             options = self.option_data[symbol]
+            
+            # Log data for debugging
+            if self.debug_mode:
+                logger.info(f"Option data for {symbol}: {len(options)} options")
+                if options:
+                    sample_key = next(iter(options))
+                    logger.info(f"Sample option: {options[sample_key]}")
             
             # Create table header
             header = html.Thead(html.Tr([
@@ -317,6 +409,10 @@ class RealTimeHandler:
                     html.Td(option['timestamp'].strftime("%H:%M:%S"))
                 ]))
             
+            if not rows:
+                logger.warning(f"No options of type {option_type} found for {symbol}")
+                return html.Div(f"No {option_type} options found for {symbol}")
+            
             # Create table body
             body = html.Tbody(rows)
             
@@ -326,4 +422,6 @@ class RealTimeHandler:
             return table
         except Exception as e:
             logger.error(f"Error creating real-time option table: {str(e)}")
+            if self.debug_mode:
+                logger.error(f"Traceback: {traceback.format_exc()}")
             return html.Div(f"Error: {str(e)}")
