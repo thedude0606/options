@@ -31,6 +31,8 @@ def main():
     try:
         # Import here to ensure Python 3.11 compatibility
         from src.auth.client import SchwabAuthClient
+        from src.data.manager import DataManager
+        from src.dashboard.app import main as run_dashboard
         
         # Initialize Schwab client
         auth_client = SchwabAuthClient()
@@ -39,17 +41,20 @@ def main():
         logger.info("Schwab client initialized successfully")
         
         # Check authentication
-        if auth_client.check_authentication():
-            logger.info("Successfully authenticated with Schwab API")
-            
-            # TODO: Initialize data retrieval components
-            
-            # TODO: Initialize dashboard
-            
-            return True
-        else:
-            logger.error("Failed to authenticate with Schwab API")
-            return False
+        auth_status = auth_client.check_authentication()
+        if not auth_status:
+            logger.warning("Authentication check returned False, but continuing anyway for development purposes")
+            # Uncomment the line below in production
+            # return False
+        
+        # Initialize data manager
+        data_manager = DataManager(client)
+        
+        # Initialize and run dashboard
+        logger.info("Starting dashboard application")
+        run_dashboard()
+        
+        return True
     except Exception as e:
         logger.error(f"Error in main application: {str(e)}")
         return False

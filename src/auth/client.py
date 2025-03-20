@@ -86,7 +86,23 @@ class SchwabAuthClient:
             client = self.get_client()
             # Try to make a simple API call to check authentication
             response = client.account_linked()
-            return response is not None and len(response) > 0
+            
+            # Handle different response types
+            if hasattr(response, 'status_code'):  # Response object from requests
+                if response.status_code == 200:
+                    logger.info("Authentication successful (status code 200)")
+                    return True
+                else:
+                    logger.error(f"Authentication failed with status code: {response.status_code}")
+                    return False
+            elif isinstance(response, list):
+                return len(response) > 0
+            elif isinstance(response, dict):
+                return 'error' not in response
+            else:
+                # If we got any response that's not an error, consider it success
+                logger.info(f"Authentication check received response type: {type(response)}")
+                return response is not None
         except Exception as e:
             logger.error(f"Authentication check failed: {str(e)}")
             return False
