@@ -17,10 +17,10 @@
 ## Technology Selections
 
 ### Backend
-- **Decision**: Python with Schwabdev library
-- **Rationale**: Schwabdev is a Python wrapper specifically designed for Schwab API
-- **Alternatives Considered**: JavaScript/Node.js with custom API integration
-- **Consequences**: Leverages existing library capabilities, faster development
+- **Decision**: Python 3.11 with Schwabdev library
+- **Rationale**: Schwabdev is a Python wrapper specifically designed for Schwab API and requires Python 3.11+
+- **Alternatives Considered**: JavaScript/Node.js with custom API integration, custom Python implementation
+- **Consequences**: Leverages existing library capabilities, faster development, but requires specific Python version
 
 ### Frontend/Dashboard
 - **Decision**: Web-based dashboard using Dash or Streamlit
