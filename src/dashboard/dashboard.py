@@ -515,4 +515,4 @@ class Dashboard:
             debug (bool): Whether to run in debug mode
             port (int): Port to run the server on
         """
-        self.app.run_server(debug=debug, port=port, host='0.0.0.0')
+        self.app.run(debug=debug, port=port, host='0.0.0.0')
