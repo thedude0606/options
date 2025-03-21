@@ -490,3 +490,21 @@ class HistoricalDataRetriever:
         Alias for get_option_chain for compatibility.
         """
         return self.get_option_chain(symbol, **kwargs)
+
+
+# Backward compatibility for HistoricalStockData class
+class HistoricalStockData(HistoricalDataRetriever):
+    """
+    Backward compatibility class for HistoricalStockData.
+    This class inherits from HistoricalDataRetriever to maintain backward compatibility.
+    """
+    
+    def __init__(self, client):
+        """
+        Initialize the historical stock data retriever.
+        
+        Args:
+            client (schwabdev.Client): Initialized Schwab client
+        """
+        logger.info("Using HistoricalStockData (backward compatibility class)")
+        super().__init__(client)
