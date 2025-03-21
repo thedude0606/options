@@ -34,6 +34,11 @@ def main():
         from src.data.manager import DataManager
         from src.dashboard.app import main as run_dashboard
         
+        # Enable debug logging
+        logging.getLogger('src.data.realtime').setLevel(logging.DEBUG)
+        logging.getLogger('src.dashboard.realtime_integration').setLevel(logging.DEBUG)
+        logging.getLogger('src.dashboard.realtime_handler').setLevel(logging.DEBUG)
+        
         # Initialize Schwab client
         auth_client = SchwabAuthClient()
         client = auth_client.get_client()
@@ -49,6 +54,20 @@ def main():
         
         # Initialize data manager
         data_manager = DataManager(client)
+        
+        # Get a quote for a test symbol
+        test_symbol = 'AAPL'
+        logger.info(f"Testing data retrieval with symbol: {test_symbol}")
+        quote = data_manager.get_quote(test_symbol)
+        logger.info(f"Quote data: {quote}")
+        
+        # Try to start streaming explicitly
+        logger.info("Attempting to start real-time streaming manually")
+        streaming_result = data_manager.start_streaming(
+            symbols=['AAPL', 'MSFT'], 
+            handlers={'QUOTE': lambda x: logger.info(f"QUOTE update: {x}")}
+        )
+        logger.info(f"Streaming start result: {streaming_result}")
         
         # Initialize and run dashboard
         logger.info("Starting dashboard application")
