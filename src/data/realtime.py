@@ -268,12 +268,13 @@ class RealTimeDataStreamer:
                 'bidPrice': ['bidPrice', 'bid', 'bid_price'],
                 'askPrice': ['askPrice', 'ask', 'ask_price'],
                 'lastPrice': ['lastPrice', 'last', 'last_price'],
-                'totalVolume': ['totalVolume', 'volume', 'total_volume'],
                 'openInterest': ['openInterest', 'open_interest'],
+                'volatility': ['volatility', 'implied_volatility'],
                 'delta': ['delta'],
                 'gamma': ['gamma'],
                 'theta': ['theta'],
-                'vega': ['vega']
+                'vega': ['vega'],
+                'rho': ['rho']
             }
             
             # Try to extract fields using different possible field names
@@ -283,14 +284,7 @@ class RealTimeDataStreamer:
                         data[target_field] = message[field]
                         break
                 if target_field not in data:
-                    if target_field in ['delta', 'gamma', 'theta', 'vega']:
-                        data[target_field] = 0.0
-                    elif target_field in ['strikePrice', 'bidPrice', 'askPrice', 'lastPrice']:
-                        data[target_field] = 0.0
-                    elif target_field in ['totalVolume', 'openInterest']:
-                        data[target_field] = 0
-                    else:
-                        data[target_field] = ''
+                    data[target_field] = 0
             
             # Call any registered callbacks for this data type
             if 'OPTION' in self.data_handlers:
@@ -334,59 +328,21 @@ class RealTimeDataStreamer:
         Args:
             symbols (list): List of symbols to stream
             fields (list): List of fields to stream
-            handler (function): Handler function for the streamed data
+            handler (function): Handler function for the stream
             
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            streamer = self.get_streamer()
+            if symbols is None:
+                symbols = []
             
-            if streamer is None:
-                logger.error("Failed to initialize streamer")
-                return False
+            # Register handler if provided
+            if handler is not None:
+                for field in fields if fields else ['QUOTE']:
+                    self.register_handler(field, handler)
             
-            # Use default handler if none provided
-            if handler is None:
-                handler = self.default_handler
-            
-            # Start the streamer with the provided handler
-            try:
-                streamer.start(handler)
-                logger.info("Streamer started successfully")
-            except Exception as e:
-                logger.error(f"Error starting streamer: {str(e)}")
-                if self.debug_mode:
-                    logger.error(f"Traceback: {traceback.format_exc()}")
-                return False
-            
-            # Add subscriptions if symbols are provided
-            if symbols:
-                success = self.add_subscriptions(symbols, fields)
-                if not success:
-                    logger.error("Failed to add subscriptions")
-                    return False
-            
-            logger.info(f"Started streaming real-time data for symbols: {symbols}")
-            return True
-        except Exception as e:
-            logger.error(f"Error starting real-time data streaming: {str(e)}")
-            if self.debug_mode:
-                logger.error(f"Traceback: {traceback.format_exc()}")
-            return False
-    
-    def add_subscriptions(self, symbols, fields=None):
-        """
-        Add subscriptions to the streamer.
-        
-        Args:
-            symbols (list): List of symbols to subscribe to
-            fields (list): List of fields to subscribe to
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
+            # Get streamer
             streamer = self.get_streamer()
             
             if streamer is None:
@@ -405,11 +361,62 @@ class RealTimeDataStreamer:
                         try:
                             # Add subscription based on field type
                             if field == 'QUOTE':
-                                streamer.add_quote_subscription(symbol)
-                                logger.info(f"Added quote subscription for {symbol}")
+                                # Use the correct method for subscribing to quotes
+                                # Based on Schwabdev documentation, we should use a method like this:
+                                try:
+                                    # Try the most likely method names based on documentation
+                                    if hasattr(streamer, 'level_one_equity_subs'):
+                                        streamer.level_one_equity_subs([symbol])
+                                        logger.info(f"Added quote subscription for {symbol} using level_one_equity_subs")
+                                    elif hasattr(streamer, 'quote_subs'):
+                                        streamer.quote_subs([symbol])
+                                        logger.info(f"Added quote subscription for {symbol} using quote_subs")
+                                    elif hasattr(streamer, 'add_level_one_equity_handler'):
+                                        # If we have a handler method, we might need to register the handler first
+                                        streamer.add_level_one_equity_handler(self.quote_handler)
+                                        streamer.level_one_equity_subs([symbol])
+                                        logger.info(f"Added quote subscription for {symbol} using add_level_one_equity_handler")
+                                    else:
+                                        # If we can't find the right method, log the available methods
+                                        available_methods = [method for method in dir(streamer) if not method.startswith('_')]
+                                        logger.warning(f"Could not find appropriate subscription method. Available methods: {available_methods}")
+                                        logger.info(f"Attempting generic subscription for {symbol}")
+                                        # Try a generic subscription approach
+                                        if hasattr(streamer, 'start'):
+                                            streamer.start(self.default_handler)
+                                            logger.info(f"Started generic streaming for {symbol}")
+                                except Exception as e:
+                                    logger.error(f"Error adding quote subscription for {symbol}: {str(e)}")
+                                    if self.debug_mode:
+                                        logger.error(f"Traceback: {traceback.format_exc()}")
                             elif field == 'OPTION':
-                                streamer.add_option_subscription(symbol)
-                                logger.info(f"Added option subscription for {symbol}")
+                                # Use the correct method for subscribing to options
+                                try:
+                                    # Try the most likely method names based on documentation
+                                    if hasattr(streamer, 'level_one_option_subs'):
+                                        streamer.level_one_option_subs([symbol])
+                                        logger.info(f"Added option subscription for {symbol} using level_one_option_subs")
+                                    elif hasattr(streamer, 'option_subs'):
+                                        streamer.option_subs([symbol])
+                                        logger.info(f"Added option subscription for {symbol} using option_subs")
+                                    elif hasattr(streamer, 'add_level_one_option_handler'):
+                                        # If we have a handler method, we might need to register the handler first
+                                        streamer.add_level_one_option_handler(self.option_handler)
+                                        streamer.level_one_option_subs([symbol])
+                                        logger.info(f"Added option subscription for {symbol} using add_level_one_option_handler")
+                                    else:
+                                        # If we can't find the right method, log the available methods
+                                        available_methods = [method for method in dir(streamer) if not method.startswith('_')]
+                                        logger.warning(f"Could not find appropriate subscription method. Available methods: {available_methods}")
+                                        logger.info(f"Attempting generic subscription for {symbol}")
+                                        # Try a generic subscription approach
+                                        if hasattr(streamer, 'start'):
+                                            streamer.start(self.default_handler)
+                                            logger.info(f"Started generic streaming for {symbol}")
+                                except Exception as e:
+                                    logger.error(f"Error adding option subscription for {symbol}: {str(e)}")
+                                    if self.debug_mode:
+                                        logger.error(f"Traceback: {traceback.format_exc()}")
                             # Add more field types as needed
                             
                             self.active_subscriptions.add(subscription)
@@ -419,9 +426,10 @@ class RealTimeDataStreamer:
                                 logger.error(f"Traceback: {traceback.format_exc()}")
                             continue
             
+            logger.info(f"Started streaming real-time data for symbols: {symbols}")
             return True
         except Exception as e:
-            logger.error(f"Error adding subscriptions: {str(e)}")
+            logger.error(f"Error starting real-time data streaming: {str(e)}")
             if self.debug_mode:
                 logger.error(f"Traceback: {traceback.format_exc()}")
             return False
@@ -437,22 +445,16 @@ class RealTimeDataStreamer:
             streamer = self.get_streamer()
             
             if streamer is None:
-                logger.error("No active streamer to stop")
+                logger.error("Failed to get streamer")
                 return False
             
-            # Stop the streamer
-            try:
+            # Stop streaming
+            if hasattr(streamer, 'stop'):
                 streamer.stop()
-                logger.info("Streamer stopped successfully")
-            except Exception as e:
-                logger.error(f"Error stopping streamer: {str(e)}")
-                if self.debug_mode:
-                    logger.error(f"Traceback: {traceback.format_exc()}")
-                return False
+            elif hasattr(streamer, 'disconnect'):
+                streamer.disconnect()
             
-            # Clear active subscriptions
-            self.active_subscriptions.clear()
-            
+            self.active_subscriptions = set()
             logger.info("Stopped streaming real-time data")
             return True
         except Exception as e:
