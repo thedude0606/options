@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime
 
 from .historical import HistoricalStockData
-from .realtime import RealTimeDataStreamer
+from .streamer_singleton import StreamerSingleton
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -30,7 +30,8 @@ class DataManager:
         """
         self.client = client
         self.historical_data = HistoricalStockData(client)
-        self.realtime_data = RealTimeDataStreamer(client)
+        # Use the singleton pattern for real-time data streamer
+        self.realtime_data = StreamerSingleton.get_instance(client)
         self.data_cache = {}
         self.data_directory = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
         
