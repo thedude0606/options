@@ -78,6 +78,31 @@ class DataManager:
             self.data_cache[cache_key] = df
         
         return df
+        
+    def get_historical_data(self, symbol, period_type='day', period=10, 
+                           frequency_type='minute', frequency=1, use_cache=True):
+        """
+        Alias for get_price_history to maintain compatibility with dashboard.
+        
+        Args:
+            symbol (str): Stock symbol
+            period_type (str): Type of period ('day', 'month', 'year', 'ytd')
+            period (int): Number of periods
+            frequency_type (str): Type of frequency ('minute', 'daily', 'weekly', 'monthly')
+            frequency (int): Frequency
+            use_cache (bool): Whether to use cached data if available
+            
+        Returns:
+            pandas.DataFrame: Historical price data
+        """
+        return self.get_price_history(
+            symbol=symbol,
+            period_type=period_type,
+            period=period,
+            frequency_type=frequency_type,
+            frequency=frequency,
+            use_cache=use_cache
+        )
     
     def get_option_chain(self, symbol, **kwargs):
         """
@@ -91,6 +116,19 @@ class DataManager:
             dict: Option chain data
         """
         return self.historical_data.get_option_chain(symbol, **kwargs)
+        
+    def get_options_chain(self, symbol, **kwargs):
+        """
+        Alias for get_option_chain to maintain compatibility with dashboard.
+        
+        Args:
+            symbol (str): Stock symbol
+            **kwargs: Additional arguments for option chain retrieval
+            
+        Returns:
+            dict: Option chain data
+        """
+        return self.get_option_chain(symbol, **kwargs)
     
     def get_quote(self, symbols):
         """

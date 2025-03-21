@@ -348,7 +348,13 @@ class RealTimeDataStreamer:
             
             # Register handler if provided
             if handler:
-                self.streamer.add_handler(handler)
+                # Check if streamer has add_handler method, otherwise use on_message
+                if hasattr(self.streamer, 'add_handler'):
+                    self.streamer.add_handler(handler)
+                elif hasattr(self.streamer, 'on_message'):
+                    self.streamer.on_message = handler
+                else:
+                    logger.error("Streamer does not have add_handler or on_message methods")
             
             # Check if symbols are provided
             if not symbols:
@@ -369,8 +375,13 @@ class RealTimeDataStreamer:
                     logger.info(f"Using {method_name} method for subscription")
                     
                     try:
-                        # Subscribe to symbols
-                        method(symbols=symbols, fields=fields)
+                        # Subscribe to symbols - use correct parameter name based on method
+                        if method_name == 'level_one_equities' or method_name == 'level_one_options':
+                            # Schwab API uses 'symbol_list' instead of 'symbols'
+                            method(symbol_list=symbols, fields=fields)
+                        else:
+                            # Fall back to original parameter name for other methods
+                            method(symbols=symbols, fields=fields)
                         method_found = True
                         break
                     except Exception as e:
