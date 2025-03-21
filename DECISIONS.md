@@ -38,6 +38,12 @@
 - **Alternatives Considered**: Monolithic analytics engine
 - **Consequences**: More maintainable code with better separation of concerns, easier to extend with new analytics
 
+### Error Handling Strategy
+- **Decision**: Implement comprehensive error handling with detailed logging
+- **Rationale**: Provides better visibility into system behavior and makes troubleshooting easier
+- **Alternatives Considered**: Minimal error handling with generic error messages
+- **Consequences**: More robust application with better user experience during error conditions
+
 ## Technology Selections
 
 ### Backend
@@ -47,9 +53,9 @@
 - **Consequences**: Leverages existing library capabilities, faster development, but requires specific Python version
 
 ### Frontend/Dashboard
-- **Decision**: Web-based dashboard using Dash or Streamlit
-- **Rationale**: These frameworks provide easy integration with Python backend and built-in data visualization components
-- **Alternatives Considered**: React.js, Vue.js
+- **Decision**: Web-based dashboard using Dash
+- **Rationale**: Dash provides easy integration with Python backend and built-in data visualization components
+- **Alternatives Considered**: React.js, Vue.js, Streamlit
 - **Consequences**: Faster development of visualization components, potentially less customization
 
 ### Data Storage
@@ -69,6 +75,12 @@
 - **Rationale**: Provides optimized implementations of common indicators while allowing for custom extensions
 - **Alternatives Considered**: Custom implementation of all indicators
 - **Consequences**: Faster development with reliable base indicators, with flexibility to add custom ones
+
+### Visualization Components
+- **Decision**: Use Plotly for interactive charts and visualizations
+- **Rationale**: Provides rich interactive visualization capabilities that integrate well with Dash
+- **Alternatives Considered**: Matplotlib, D3.js
+- **Consequences**: Better user experience with interactive charts, consistent styling across the application
 
 ## Design Patterns
 
@@ -98,6 +110,12 @@
 - **Rationale**: Allows for swapping different analysis algorithms at runtime
 - **Alternatives Considered**: Hard-coded analysis logic
 - **Consequences**: More flexible system that can adapt to different market conditions
+
+### Facade Pattern
+- **Decision**: Implement facade pattern for the DataManager class
+- **Rationale**: Provides a simplified interface to the complex subsystem of data retrieval components
+- **Alternatives Considered**: Direct access to individual data components
+- **Consequences**: Cleaner client code, better encapsulation of implementation details
 
 ## Implementation Decisions
 
@@ -142,3 +160,15 @@
 - **Rationale**: Provides more accurate performance assessment of trading strategies
 - **Alternatives Considered**: Simplified backtesting without market friction
 - **Consequences**: More complex implementation but more realistic strategy evaluation
+
+### Environment Configuration
+- **Decision**: Use dotenv for environment variable management
+- **Rationale**: Provides a secure and flexible way to manage configuration without hardcoding
+- **Alternatives Considered**: Configuration files, command-line arguments
+- **Consequences**: Better security practices, easier configuration management across environments
+
+### Error Recovery Strategy
+- **Decision**: Implement automatic reconnection for streaming data with exponential backoff
+- **Rationale**: Improves system resilience during temporary network issues or API disruptions
+- **Alternatives Considered**: Manual reconnection or simple retry logic
+- **Consequences**: More complex implementation but better user experience with self-healing capabilities
