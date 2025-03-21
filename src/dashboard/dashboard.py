@@ -222,7 +222,8 @@ class Dashboard:
         @self.app.callback(
             Output("symbol-list", "children", allow_duplicate=True),
             [Input({"type": "remove-symbol", "index": dash.ALL}, "n_clicks")],
-            [State("symbol-list", "children")]
+            [State("symbol-list", "children")],
+            prevent_initial_call=True
         )
         def remove_symbol(n_clicks_list, current_list):
             # Find which button was clicked
@@ -259,7 +260,8 @@ class Dashboard:
              Output("status-indicator", "children", allow_duplicate=True)],
             [Input("refresh-button", "n_clicks"),
              Input("update-interval", "n_intervals")],
-            [State("time-period-dropdown", "value")]
+            [State("time-period-dropdown", "value")],
+            prevent_initial_call=True
         )
         def fetch_and_store_data(n_clicks, n_intervals, time_period):
             # Initialize with empty data
@@ -484,7 +486,8 @@ class Dashboard:
         @self.app.callback(
             [Output("update-interval", "disabled"),
              Output("status-indicator", "children", allow_duplicate=True)],
-            [Input("realtime-toggle", "value")]
+            [Input("realtime-toggle", "value")],
+            prevent_initial_call=True
         )
         def toggle_realtime(value):
             # Check which input triggered the callback
