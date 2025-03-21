@@ -6,6 +6,8 @@
 - [x] Implement authentication framework using Schwab developer credentials
 - [x] Create basic project structure for the dashboard application
 - [x] Set up environment for local development and testing
+- [x] Fix duplicate callback outputs in dashboard components
+- [x] Resolve streamer singleton issues to prevent multiple connection conflicts
 
 ## Medium Priority
 - [x] Implement historical data retrieval components
@@ -20,6 +22,8 @@
 - [x] Implement real-time data features
   - [x] Integrate real-time data with dashboard
   - [x] Add real-time updates to charts and tables
+  - [x] Enhance StreamerSingleton with better thread management
+  - [x] Improve RealTimeDataStreamer initialization and error handling
 - [x] Test application functionality
   - [x] Test authentication and data retrieval
   - [x] Test dashboard components

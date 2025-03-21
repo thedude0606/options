@@ -25,6 +25,7 @@ class StreamerSingleton:
     _event_loop = None
     _thread = None
     _running = False
+    _client = None
     
     @classmethod
     def get_instance(cls, client=None):
@@ -41,7 +42,12 @@ class StreamerSingleton:
             if cls._instance is None:
                 logger.info("Creating new StreamerSingleton instance")
                 cls._instance = cls()
+            
+            # Store the client reference for potential reconnection
+            if client is not None:
+                cls._client = client
                 
+            # Only initialize if not already initialized or if we need to reinitialize with a new client
             if client is not None and not cls._initialized:
                 logger.info("Initializing streamer with provided client")
                 # Create the streamer but don't start it yet
@@ -61,6 +67,11 @@ class StreamerSingleton:
         This prevents asyncio event loop conflicts.
         """
         try:
+            # If there's already a thread running, stop it first
+            if cls._running and cls._thread and cls._thread.is_alive():
+                logger.info("Stopping existing streamer thread before starting a new one")
+                cls.reset()
+                
             logger.info("Starting streamer in dedicated thread")
             cls._running = True
             cls._thread = threading.Thread(target=cls._run_streamer_loop, daemon=True)

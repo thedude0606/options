@@ -5,7 +5,7 @@ This module provides the main dashboard interface for the application.
 
 import logging
 import dash
-from dash import dcc, html, callback, Input, Output, State
+from dash import dcc, html, callback, Input, Output, State, callback_context
 import plotly.graph_objs as go
 import pandas as pd
 import os
@@ -222,29 +222,41 @@ class Dashboard:
         @self.app.callback(
             Output("symbol-list", "children", allow_duplicate=True),
             [Input({"type": "remove-symbol", "index": dash.ALL}, "n_clicks")],
-            [State("symbol-list", "children")],
-            prevent_initial_call=True
+            [State("symbol-list", "children")]
         )
-        def remove_symbol(n_clicks, current_list):
-            ctx = dash.callback_context
+        def remove_symbol(n_clicks_list, current_list):
+            # Find which button was clicked
+            ctx = callback_context
             if not ctx.triggered:
-                return current_list
+                return dash.no_update
             
-            button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-            index = eval(button_id)["index"]
+            button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+            if not button_id:
+                return dash.no_update
             
-            if index < len(self.current_symbols):
-                self.current_symbols.pop(index)
-            
-            return [html.Div([
-                html.Span(s),
-                html.Button("×", id={"type": "remove-symbol", "index": i}, className="remove-button")
-            ], className="symbol-item") for i, s in enumerate(self.current_symbols)]
+            try:
+                # Extract the index from the button ID
+                import json
+                button_data = json.loads(button_id)
+                index = button_data['index']
+                
+                # Remove the symbol from the list
+                if index < len(self.current_symbols):
+                    del self.current_symbols[index]
+                
+                # Return the updated list
+                return [html.Div([
+                    html.Span(s),
+                    html.Button("×", id={"type": "remove-symbol", "index": i}, className="remove-button")
+                ], className="symbol-item") for i, s in enumerate(self.current_symbols)]
+            except Exception as e:
+                logger.error(f"Error removing symbol: {str(e)}")
+                return dash.no_update
         
         # Callback to fetch and store data
         @self.app.callback(
             [Output("stored-data", "children"),
-             Output("status-indicator", "children")],
+             Output("status-indicator", "children", allow_duplicate=True)],
             [Input("refresh-button", "n_clicks"),
              Input("update-interval", "n_intervals")],
             [State("time-period-dropdown", "value")]
@@ -258,48 +270,54 @@ class Dashboard:
                 # Parse time period
                 period_type, period = self._parse_time_period(time_period)
                 
-                # Determine appropriate frequency based on period
-                frequency_type, frequency = self._determine_frequency(period_type, period)
+                # Check which input triggered the callback
+                ctx = callback_context
+                trigger_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
                 
                 # Fetch data for each symbol
                 all_data = {}
                 for symbol in self.current_symbols:
-                    df = self.data_manager.get_price_history(
-                        symbol=symbol,
-                        period_type=period_type,
-                        period=period,
-                        frequency_type=frequency_type,
-                        frequency=frequency
-                    )
-                    
-                    if not df.empty:
-                        all_data[symbol] = df.to_json(date_format='iso', orient='split')
+                    try:
+                        # Get historical data
+                        data = self.data_manager.get_historical_data(
+                            symbol=symbol,
+                            period_type=period_type,
+                            period=period
+                        )
+                        
+                        if data is not None:
+                            all_data[symbol] = data
+                    except Exception as e:
+                        logger.error(f"Error fetching data for {symbol}: {str(e)}")
                 
-                # Store data as JSON string
-                return str(all_data), html.Span("Data Updated", className="status-success")
-            
+                # Store data as JSON
+                import json
+                stored_data = json.dumps(all_data)
+                
+                # Update status
+                if trigger_id == "refresh-button":
+                    status = html.Span("Data refreshed", className="status-success")
+                else:
+                    status = html.Span("Data updated", className="status-success")
+                
+                return stored_data, status
             except Exception as e:
-                logger.error(f"Error fetching data: {str(e)}")
+                logger.error(f"Error fetching and storing data: {str(e)}")
                 return "", html.Span(f"Error: {str(e)}", className="status-error")
         
         # Callback to update price chart
         @self.app.callback(
             Output("price-chart", "figure"),
             [Input("stored-data", "children"),
-             Input("update-interval", "n_intervals")]
+             Input("tabs", "value")],
+            [State("time-period-dropdown", "value")]
         )
-        def update_price_chart(stored_data, n_intervals):
-            # Check if real-time is active
-            if self.realtime_active and n_intervals > 0:
-                # Use real-time data
-                return self.realtime_handler.get_real_time_price_figure(self.current_symbols)
-            
+        def update_price_chart(stored_data, tab_value, time_period):
             if not stored_data:
-                # Return empty figure
                 return {
                     "data": [],
                     "layout": {
-                        "title": "Price Chart",
+                        "title": "Price Chart (No Data Available)",
                         "xaxis": {"title": "Date"},
                         "yaxis": {"title": "Price ($)"}
                     }
@@ -307,33 +325,21 @@ class Dashboard:
             
             try:
                 # Parse stored data
-                all_data = eval(stored_data)
+                import json
+                all_data = json.loads(stored_data)
                 
-                # Create traces for each symbol
-                traces = []
-                for symbol, json_data in all_data.items():
-                    df = pd.read_json(json_data, orient='split')
-                    
-                    traces.append(go.Scatter(
-                        x=df['datetime'],
-                        y=df['close'],
-                        mode='lines',
-                        name=symbol
-                    ))
-                
-                # Create figure
-                figure = {
-                    "data": traces,
-                    "layout": {
-                        "title": "Price Chart",
-                        "xaxis": {"title": "Date"},
-                        "yaxis": {"title": "Price ($)"},
-                        "hovermode": "closest"
+                if not all_data:
+                    return {
+                        "data": [],
+                        "layout": {
+                            "title": "Price Chart (No Data Available)",
+                            "xaxis": {"title": "Date"},
+                            "yaxis": {"title": "Price ($)"}
+                        }
                     }
-                }
                 
-                return figure
-            
+                # Create candlestick chart
+                return create_candlestick_chart(all_data, time_period)
             except Exception as e:
                 logger.error(f"Error updating price chart: {str(e)}")
                 return {
@@ -349,20 +355,14 @@ class Dashboard:
         @self.app.callback(
             Output("volume-chart", "figure"),
             [Input("stored-data", "children"),
-             Input("update-interval", "n_intervals")]
+             Input("tabs", "value")]
         )
-        def update_volume_chart(stored_data, n_intervals):
-            # Check if real-time is active
-            if self.realtime_active and n_intervals > 0:
-                # Use real-time data
-                return self.realtime_handler.get_real_time_volume_figure(self.current_symbols)
-            
+        def update_volume_chart(stored_data, tab_value):
             if not stored_data:
-                # Return empty figure
                 return {
                     "data": [],
                     "layout": {
-                        "title": "Volume Chart",
+                        "title": "Volume Chart (No Data Available)",
                         "xaxis": {"title": "Date"},
                         "yaxis": {"title": "Volume"}
                     }
@@ -370,17 +370,36 @@ class Dashboard:
             
             try:
                 # Parse stored data
-                all_data = eval(stored_data)
+                import json
+                all_data = json.loads(stored_data)
                 
-                # Create traces for each symbol
+                if not all_data:
+                    return {
+                        "data": [],
+                        "layout": {
+                            "title": "Volume Chart (No Data Available)",
+                            "xaxis": {"title": "Date"},
+                            "yaxis": {"title": "Volume"}
+                        }
+                    }
+                
+                # Create volume chart
                 traces = []
-                for symbol, json_data in all_data.items():
-                    df = pd.read_json(json_data, orient='split')
+                for symbol, data in all_data.items():
+                    if not data:
+                        continue
                     
+                    # Convert to DataFrame
+                    df = pd.DataFrame(data)
+                    
+                    if df.empty:
+                        continue
+                    
+                    # Add volume trace
                     traces.append(go.Bar(
                         x=df['datetime'],
                         y=df['volume'],
-                        name=symbol
+                        name=f"{symbol} Volume"
                     ))
                 
                 # Create figure
@@ -395,7 +414,6 @@ class Dashboard:
                 }
                 
                 return figure
-            
             except Exception as e:
                 logger.error(f"Error updating volume chart: {str(e)}")
                 return {
@@ -407,26 +425,54 @@ class Dashboard:
                     }
                 }
         
+        # Callback to update options data
+        @self.app.callback(
+            [Output("options-data", "children"),
+             Output("expiration-dropdown", "options")],
+            [Input("symbol-input", "value"),
+             Input("tabs", "value")]
+        )
+        def update_options_data(symbol, tab_value):
+            if not symbol:
+                return "", []
+            
+            try:
+                # Get options chain
+                options_chain = self.data_manager.get_options_chain(symbol)
+                
+                if not options_chain:
+                    return "", []
+                
+                # Store options data as JSON
+                import json
+                stored_data = json.dumps(options_chain)
+                
+                # Get expiration dates
+                expiration_dates = get_expiration_dates(options_chain)
+                
+                # Create dropdown options
+                dropdown_options = [{"label": date, "value": date} for date in expiration_dates]
+                
+                return stored_data, dropdown_options
+            except Exception as e:
+                logger.error(f"Error updating options data: {str(e)}")
+                return "", []
+        
         # Callback to update options table
         @self.app.callback(
             Output("options-table", "children"),
-            [Input("symbol-input", "value"),
-             Input("option-type-radio", "value"),
-             Input("update-interval", "n_intervals")]
+            [Input("options-data", "children"),
+             Input("expiration-dropdown", "value"),
+             Input("option-type-radio", "value")]
         )
-        def update_options_table(symbol, option_type, n_intervals):
-            # Check if real-time is active
-            if self.realtime_active and n_intervals > 0 and symbol:
-                # Use real-time data
-                return self.realtime_handler.get_real_time_option_table(symbol, option_type)
-            
-            # If not real-time or no symbol, try to get historical data
-            if not symbol:
-                return html.Div("Enter a symbol to view options data")
+        def update_options_table(options_data, expiration_date, option_type):
+            if not options_data or not expiration_date:
+                return html.Div("Select a symbol and expiration date to view options chain")
             
             try:
-                # Get option chain from data manager
-                option_chain = self.data_manager.get_option_chain(symbol)
+                # Parse options data
+                import json
+                option_chain = json.loads(options_data)
                 
                 # Format option chain for display
                 return format_option_chain_table(option_chain, option_type)
@@ -437,10 +483,14 @@ class Dashboard:
         # Callback to toggle real-time updates
         @self.app.callback(
             [Output("update-interval", "disabled"),
-             Output("status-indicator", "children")],
+             Output("status-indicator", "children", allow_duplicate=True)],
             [Input("realtime-toggle", "value")]
         )
         def toggle_realtime(value):
+            # Check which input triggered the callback
+            ctx = callback_context
+            trigger_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+            
             if value == "on" and not self.realtime_active:
                 # Start real-time streaming
                 success = self.realtime.start_streaming(symbols=self.current_symbols)
@@ -459,60 +509,64 @@ class Dashboard:
                     return True, html.Span("Real-time streaming stopped", className="status-idle")
                 else:
                     return False, html.Span("Failed to stop real-time streaming", className="status-error")
+            else:
+                # No change
+                return True if value == "off" else False, dash.no_update
+        
+        # Callback to update data table
+        @self.app.callback(
+            Output("data-table", "children"),
+            [Input("stored-data", "children"),
+             Input("tabs", "value")]
+        )
+        def update_data_table(stored_data, tab_value):
+            if not stored_data:
+                return html.Div("No data available")
             
-            return value != "on", html.Span("Idle", className="status-idle")
+            try:
+                # Parse stored data
+                import json
+                all_data = json.loads(stored_data)
+                
+                if not all_data:
+                    return html.Div("No data available")
+                
+                # Create data table
+                return create_data_table(all_data)
+            except Exception as e:
+                logger.error(f"Error updating data table: {str(e)}")
+                return html.Div(f"Error: {str(e)}")
     
     def _parse_time_period(self, time_period):
         """
         Parse time period string into period type and period.
         
         Args:
-            time_period (str): Time period string (e.g., 'day_1', 'month_3', 'year_5')
+            time_period (str): Time period string (e.g., 'day_1', 'month_3')
             
         Returns:
             tuple: (period_type, period)
         """
         parts = time_period.split('_')
+        if len(parts) != 2:
+            return 'day', 1
+        
         period_type = parts[0]
-        period = int(parts[1])
+        try:
+            period = int(parts[1])
+        except ValueError:
+            period = 1
         
         return period_type, period
     
-    def _determine_frequency(self, period_type, period):
-        """
-        Determine appropriate frequency based on period type and period.
-        
-        Args:
-            period_type (str): Period type ('day', 'month', 'year')
-            period (int): Period value
-            
-        Returns:
-            tuple: (frequency_type, frequency)
-        """
-        if period_type == 'day':
-            if period <= 1:
-                return 'minute', 5
-            else:
-                return 'minute', 30
-        elif period_type == 'month':
-            if period <= 1:
-                return 'daily', 1
-            else:
-                return 'daily', 1
-        elif period_type == 'year':
-            if period <= 1:
-                return 'weekly', 1
-            else:
-                return 'monthly', 1
-        else:
-            return 'daily', 1
-    
-    def run(self, debug=False, port=8050):
+    def run(self, host='0.0.0.0', port=8050, debug=True):
         """
         Run the dashboard server.
         
         Args:
-            debug (bool): Whether to run in debug mode
+            host (str): Host to run the server on
             port (int): Port to run the server on
+            debug (bool): Whether to run in debug mode
         """
-        self.app.run(debug=debug, port=port, host='0.0.0.0')
+        logger.info(f"Starting dashboard server on port {port}")
+        self.app.run_server(host=host, port=port, debug=debug)

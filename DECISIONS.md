@@ -20,6 +20,18 @@
 - **Alternatives Considered**: Simpler implementation with less error handling
 - **Consequences**: More complex code but significantly improved reliability and easier debugging
 
+### Streaming Architecture
+- **Decision**: Implement StreamerSingleton with enhanced thread management and connection handling
+- **Rationale**: Prevents multiple connection conflicts when different parts of the application attempt to create streaming connections
+- **Alternatives Considered**: Separate streaming instances for different components
+- **Consequences**: More reliable streaming with fewer disconnections, but requires careful singleton implementation
+
+### Dashboard Callbacks
+- **Decision**: Use allow_duplicate=True parameter for overlapping callback outputs
+- **Rationale**: Resolves duplicate callback output errors while maintaining separate callback functions for different triggers
+- **Alternatives Considered**: Combining callbacks into a single function
+- **Consequences**: Cleaner code organization with separate callbacks for different functionality, while avoiding conflicts
+
 ## Technology Selections
 
 ### Backend
@@ -57,6 +69,12 @@
 - **Rationale**: Provides flexibility in creating different types of data retrievers
 - **Consequences**: More extensible code, easier to add new data types
 
+### Singleton Pattern
+- **Decision**: Use enhanced singleton pattern for streamer management
+- **Rationale**: Ensures only one streaming connection is active at a time, preventing conflicts
+- **Alternatives Considered**: Global instance or dependency injection
+- **Consequences**: More reliable streaming with better resource management
+
 ## Implementation Decisions
 
 ### Message Parsing Strategy
@@ -70,3 +88,9 @@
 - **Rationale**: Makes it easier to identify and fix issues with data flow
 - **Alternatives Considered**: Minimal logging with console output
 - **Consequences**: Better visibility into system behavior, easier troubleshooting
+
+### Thread Management
+- **Decision**: Implement dedicated thread with its own event loop for streaming
+- **Rationale**: Prevents asyncio event loop conflicts and ensures proper resource management
+- **Alternatives Considered**: Using main application thread or shared event loop
+- **Consequences**: More complex implementation but avoids common pitfalls with asyncio and threading

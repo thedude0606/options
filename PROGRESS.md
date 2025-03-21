@@ -37,6 +37,10 @@
 - Fixed real-time data flow issues with improved message handling and error reporting
 - Added debug mode to help diagnose streaming data issues
 - Enhanced message parsing to handle different Schwab API response formats
+- Fixed duplicate callback outputs in dashboard components
+- Resolved streamer singleton issues to prevent multiple connection conflicts
+- Enhanced StreamerSingleton class with better thread management and connection handling
+- Improved RealTimeDataStreamer with better initialization tracking and error handling
 
 ### Testing
 - Created comprehensive test suite for application components
