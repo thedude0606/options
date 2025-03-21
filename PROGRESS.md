@@ -52,15 +52,25 @@
 ## Current Work in Progress
 - Finalizing documentation
 - Preparing for final GitHub push
+- Fixing Dash compatibility issues (replacing run_server with app.run_server)
+- Enhancing error handling for different API response types
 
 ## Known Issues and Challenges
 - Authentication requires Python 3.11+ due to Schwabdev library requirements
 - Real authentication requires browser interaction for OAuth flow
 - Mock tests are used for CI/CD environments where authentication isn't possible
 - ~~Data doesn't appear in dashboard despite successful authentication~~ (Fixed)
+- Occasional streaming data disconnections requiring reconnection logic
+- Dash compatibility issues with newer versions requiring syntax updates
 
 ## Next Steps
 - Add additional data filtering options
 - Implement data export functionality
 - Add user preferences and settings
 - Optimize performance for large datasets
+- Implement advanced options analytics features (Greeks visualization, implied volatility surface)
+- Add multi-timeframe analysis capabilities (15-min, 1-hour, daily)
+- Integrate technical indicators including Fair Value Gap analysis
+- Develop hybrid ML models for options trading predictions
+- Implement dynamic risk management features
+- Add comprehensive backtesting capabilities

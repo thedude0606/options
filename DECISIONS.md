@@ -32,6 +32,12 @@
 - **Alternatives Considered**: Combining callbacks into a single function
 - **Consequences**: Cleaner code organization with separate callbacks for different functionality, while avoiding conflicts
 
+### Analytics Architecture
+- **Decision**: Implement modular analytics components for options Greeks and strategy analysis
+- **Rationale**: Allows for independent development and testing of different analytics features
+- **Alternatives Considered**: Monolithic analytics engine
+- **Consequences**: More maintainable code with better separation of concerns, easier to extend with new analytics
+
 ## Technology Selections
 
 ### Backend
@@ -51,6 +57,18 @@
 - **Rationale**: Simplifies initial development while allowing for future scalability
 - **Alternatives Considered**: Immediate database implementation
 - **Consequences**: Faster initial development, may require migration effort later
+
+### Machine Learning Framework
+- **Decision**: Use hybrid approach with LSTM and Reinforcement Learning models
+- **Rationale**: Combines time-series prediction capabilities of LSTM with adaptive decision-making of RL
+- **Alternatives Considered**: Pure statistical models, single ML approach
+- **Consequences**: More complex implementation but potentially better prediction accuracy for options trading
+
+### Technical Analysis Library
+- **Decision**: Use TA-Lib with custom extensions for specialized indicators
+- **Rationale**: Provides optimized implementations of common indicators while allowing for custom extensions
+- **Alternatives Considered**: Custom implementation of all indicators
+- **Consequences**: Faster development with reliable base indicators, with flexibility to add custom ones
 
 ## Design Patterns
 
@@ -75,6 +93,12 @@
 - **Alternatives Considered**: Global instance or dependency injection
 - **Consequences**: More reliable streaming with better resource management
 
+### Strategy Pattern
+- **Decision**: Implement strategy pattern for different trading analysis approaches
+- **Rationale**: Allows for swapping different analysis algorithms at runtime
+- **Alternatives Considered**: Hard-coded analysis logic
+- **Consequences**: More flexible system that can adapt to different market conditions
+
 ## Implementation Decisions
 
 ### Message Parsing Strategy
@@ -94,3 +118,15 @@
 - **Rationale**: Prevents asyncio event loop conflicts and ensures proper resource management
 - **Alternatives Considered**: Using main application thread or shared event loop
 - **Consequences**: More complex implementation but avoids common pitfalls with asyncio and threading
+
+### Multi-timeframe Analysis
+- **Decision**: Store and process data at multiple timeframes (15-min, 1-hour, daily)
+- **Rationale**: Different trading strategies require different timeframe perspectives
+- **Alternatives Considered**: Single timeframe with on-demand aggregation
+- **Consequences**: Higher storage requirements but faster analysis and visualization
+
+### Backtesting Framework
+- **Decision**: Implement event-driven backtesting with realistic slippage and commission models
+- **Rationale**: Provides more accurate performance assessment of trading strategies
+- **Alternatives Considered**: Simplified backtesting without market friction
+- **Consequences**: More complex implementation but more realistic strategy evaluation

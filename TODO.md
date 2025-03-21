@@ -8,6 +8,8 @@
 - [x] Set up environment for local development and testing
 - [x] Fix duplicate callback outputs in dashboard components
 - [x] Resolve streamer singleton issues to prevent multiple connection conflicts
+- [ ] Fix Dash compatibility issues (replace run_server with app.run_server)
+- [ ] Update error handling for different API response types
 
 ## Medium Priority
 - [x] Implement historical data retrieval components
@@ -28,14 +30,33 @@
   - [x] Test authentication and data retrieval
   - [x] Test dashboard components
   - [x] Test real-time data integration
+- [ ] Implement advanced options analytics features
+  - [ ] Add Greeks visualization components
+  - [ ] Create implied volatility surface display
+  - [ ] Implement options strategy analysis tools
 
 ## Low Priority
 - [ ] Add additional data filtering options
 - [ ] Implement data export functionality
 - [ ] Add user preferences and settings
 - [ ] Optimize performance for large datasets
+- [ ] Implement multi-timeframe analysis capabilities
+  - [ ] 15-minute timeframe analysis
+  - [ ] 1-hour timeframe analysis
+  - [ ] Daily timeframe analysis
+- [ ] Integrate technical indicators
+  - [ ] Fair Value Gap analysis
+  - [ ] Standard technical indicators (MACD, RSI, etc.)
+- [ ] Develop prediction capabilities
+  - [ ] Implement hybrid ML models (LSTM + Reinforcement Learning)
+  - [ ] Create backtesting framework
+  - [ ] Add dynamic risk management features
 
 ## Dependencies
 - Authentication framework must be completed before data retrieval components
 - Data retrieval components must be completed before dashboard interface
 - Real-time data streaming depends on authentication framework
+- Advanced options analytics features depend on options data retrieval
+- Multi-timeframe analysis depends on historical data retrieval components
+- ML prediction models depend on technical indicators and multi-timeframe analysis
+- Backtesting framework depends on historical data and strategy components
