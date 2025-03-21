@@ -61,6 +61,20 @@ class StreamerSingleton:
             self._last_heartbeat = 0
             self._executor = ThreadPoolExecutor(max_workers=1)
 
+    @classmethod
+    def get_instance(cls, client=None):
+        """
+        Get the singleton instance.
+        
+        Args:
+            client: Schwab API client (optional)
+            
+        Returns:
+            StreamerSingleton instance
+        """
+        instance = cls(client)
+        return instance
+
     def start(self):
         """
         Start the streamer in a dedicated thread.
