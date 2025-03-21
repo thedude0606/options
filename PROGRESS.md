@@ -2,6 +2,12 @@
 
 ## Completed Features/Tasks
 
+### API Integration Fixes
+- Fixed streaming method parameter issues by using 'symbol_list' instead of 'symbols' for level_one_equities and level_one_options methods
+- Added handler registration fallback to use on_message if add_handler is not available
+- Implemented missing DataManager methods (get_historical_data and get_options_chain) to maintain dashboard compatibility
+- Enhanced error handling for streaming data connections
+
 ### Documentation and Setup
 - Explored Schwab API documentation to understand authentication requirements and available endpoints
 - Set up GitHub repository structure with required documentation files
@@ -52,16 +58,18 @@
 ## Current Work in Progress
 - Finalizing documentation
 - Preparing for final GitHub push
-- Fixing Dash compatibility issues (replacing run_server with app.run_server)
-- Enhancing error handling for different API response types
+- ~~Fixing Dash compatibility issues (replacing run_server with app.run_server)~~ (Fixed)
+- ~~Enhancing error handling for different API response types~~ (Fixed)
 
 ## Known Issues and Challenges
 - Authentication requires Python 3.11+ due to Schwabdev library requirements
 - Real authentication requires browser interaction for OAuth flow
 - Mock tests are used for CI/CD environments where authentication isn't possible
 - ~~Data doesn't appear in dashboard despite successful authentication~~ (Fixed)
-- Occasional streaming data disconnections requiring reconnection logic
-- Dash compatibility issues with newer versions requiring syntax updates
+- ~~Occasional streaming data disconnections requiring reconnection logic~~ (Improved)
+- ~~Dash compatibility issues with newer versions requiring syntax updates~~ (Fixed)
+- ~~Streaming method parameter issues with level_one_equities and level_one_options~~ (Fixed)
+- ~~Missing DataManager methods causing dashboard errors~~ (Fixed)
 
 ## Next Steps
 - Add additional data filtering options

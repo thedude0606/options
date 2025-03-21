@@ -101,11 +101,23 @@
 
 ## Implementation Decisions
 
-### Message Parsing Strategy
-- **Decision**: Implement flexible message parsing to handle different Schwab API response formats
-- **Rationale**: The Schwab API can return data in different formats depending on the context
-- **Alternatives Considered**: Strict parsing expecting a single format
-- **Consequences**: More resilient to API changes and variations in response format
+### API Parameter Handling
+- **Decision**: Use parameter name 'symbol_list' for level_one_equities and level_one_options methods
+- **Rationale**: Schwab API requires 'symbol_list' parameter instead of 'symbols' for these specific methods
+- **Alternatives Considered**: Using generic parameter handling for all methods
+- **Consequences**: More reliable streaming with proper parameter names for each method type
+
+### Handler Registration Strategy
+- **Decision**: Implement fallback mechanism for handler registration (add_handler → on_message)
+- **Rationale**: Different versions of Schwab API may use different methods for registering message handlers
+- **Alternatives Considered**: Using only add_handler method
+- **Consequences**: More robust code that works with different versions of the Schwab API
+
+### Method Naming Consistency
+- **Decision**: Implement alias methods in DataManager (get_historical_data, get_options_chain)
+- **Rationale**: Maintains compatibility with dashboard components that expect these specific method names
+- **Alternatives Considered**: Updating all dashboard components to use existing method names
+- **Consequences**: Simpler implementation with backward compatibility, avoiding extensive dashboard changes
 
 ### Logging and Debugging
 - **Decision**: Add comprehensive logging and debug mode to real-time components
