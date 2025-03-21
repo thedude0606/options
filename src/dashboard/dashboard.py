@@ -572,4 +572,4 @@ class Dashboard:
             debug (bool): Whether to run in debug mode
         """
         logger.info(f"Starting dashboard server on port {port}")
-        self.app.run_server(host=host, port=port, debug=debug)
+        self.app.run(host=host, port=port, debug=debug)
