@@ -90,7 +90,7 @@ class RealTimeDataStreamer:
         """
         try:
             if self.debug_mode:
-                logger.info(f"Received message: {json.dumps(message, indent=2)}")
+                logger.info(f"Received message: {json.dumps(message)}")
             
             # Process the message based on its content
             if isinstance(message, dict):
@@ -174,7 +174,7 @@ class RealTimeDataStreamer:
         """
         try:
             if self.debug_mode:
-                logger.info(f"Processing quote: {json.dumps(message, indent=2)}")
+                logger.info(f"Processing quote: {json.dumps(message)}")
             
             # Extract symbol from message based on Schwab API format
             symbol = None
@@ -232,7 +232,7 @@ class RealTimeDataStreamer:
         """
         try:
             if self.debug_mode:
-                logger.info(f"Processing option data: {json.dumps(message, indent=2)}")
+                logger.info(f"Processing option data: {json.dumps(message)}")
             
             # Extract symbol from message based on Schwab API format
             symbol = None
@@ -271,17 +271,18 @@ class RealTimeDataStreamer:
             field_mappings = {
                 'strikePrice': ['strikePrice', 'strike', 'strike_price'],
                 'expirationDate': ['expirationDate', 'expiration', 'expiration_date'],
-                'putCall': ['putCall', 'option_type', 'type'],
+                'putCall': ['putCall', 'option_type', 'put_call'],
+                'lastPrice': ['lastPrice', 'last', 'last_price'],
                 'bidPrice': ['bidPrice', 'bid', 'bid_price'],
                 'askPrice': ['askPrice', 'ask', 'ask_price'],
-                'lastPrice': ['lastPrice', 'last', 'last_price'],
                 'totalVolume': ['totalVolume', 'volume', 'total_volume'],
                 'openInterest': ['openInterest', 'open_interest'],
                 'delta': ['delta'],
                 'gamma': ['gamma'],
                 'theta': ['theta'],
                 'vega': ['vega'],
-                'rho': ['rho']
+                'rho': ['rho'],
+                'impliedVolatility': ['impliedVolatility', 'implied_volatility', 'iv']
             }
             
             # Try to extract fields using different possible field names
@@ -291,7 +292,7 @@ class RealTimeDataStreamer:
                         data[target_field] = message[field]
                         break
                 if target_field not in data:
-                    data[target_field] = 0 if target_field not in ['expirationDate', 'putCall'] else ''
+                    data[target_field] = 0
             
             # Call any registered callbacks for this data type
             if 'OPTION' in self.data_handlers:
@@ -309,7 +310,7 @@ class RealTimeDataStreamer:
         Register a handler for a specific data type.
         
         Args:
-            data_type (str): Type of data to handle ('QUOTE', 'OPTION', etc.)
+            data_type (str): Type of data to handle
             callback (function): Callback function to handle the data
             
         Returns:
@@ -323,19 +324,17 @@ class RealTimeDataStreamer:
             logger.info(f"Registered handler for {data_type} data")
             return True
         except Exception as e:
-            logger.error(f"Error registering handler for {data_type} data: {str(e)}")
-            if self.debug_mode:
-                logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Error registering handler for {data_type}: {str(e)}")
             return False
     
-    def start_streaming(self, symbols=None, fields=None, handler=None):
+    def start_streaming(self, symbols=None, fields=None, handlers=None):
         """
-        Start streaming real-time data for specified symbols.
+        Start streaming real-time data for specific symbols.
         
         Args:
             symbols (list): List of symbols to stream
             fields (list): List of fields to stream
-            handler (function): Handler function for streamed data
+            handlers (dict): Dictionary of handlers for different data types
             
         Returns:
             bool: True if successful, False otherwise
@@ -346,15 +345,14 @@ class RealTimeDataStreamer:
                 logger.error("Failed to initialize streamer")
                 return False
             
-            # Register handler if provided
-            if handler:
-                # Check if streamer has add_handler method, otherwise use on_message
-                if hasattr(self.streamer, 'add_handler'):
-                    self.streamer.add_handler(handler)
-                elif hasattr(self.streamer, 'on_message'):
-                    self.streamer.on_message = handler
-                else:
-                    logger.error("Streamer does not have add_handler or on_message methods")
+            # Register handlers if provided
+            if handlers:
+                for data_type, handler in handlers.items():
+                    self.register_handler(data_type, handler)
+            
+            # Default fields if not provided
+            if not fields:
+                fields = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
             
             # Check if symbols are provided
             if not symbols:
@@ -376,41 +374,34 @@ class RealTimeDataStreamer:
                     
                     try:
                         # Subscribe to symbols - use correct parameter name based on method
-                        if method_name == 'level_one_equities' or method_name == 'level_one_options':
-                            # Schwab API uses 'symbol_list' instead of 'symbols'
-                            method(symbol_list=symbols, fields=fields)
-                        else:
-                            # Fall back to original parameter name for other methods
-                            method(symbols=symbols, fields=fields)
+                        # FIXED: Use 'symbols' parameter instead of 'symbol_list'
+                        method(symbols=symbols, fields=fields)
                         method_found = True
                         break
-                    except Exception as e:
+                    except TypeError as e:
                         logger.error(f"Error using {method_name} method: {str(e)}")
-                        if self.debug_mode:
-                            logger.error(f"Traceback: {traceback.format_exc()}")
+                        logger.error(f"Traceback: {traceback.format_exc()}")
+                        # Continue to try other methods
             
             if not method_found:
-                # Fallback to generic subscription
+                # Fall back to generic subscription approach
                 logger.warning(f"Could not find appropriate subscription method. Available methods: {dir(self.streamer)}")
                 
+                # Try generic subscription for each symbol
                 for symbol in symbols:
                     logger.info(f"Attempting generic subscription for {symbol}")
                     try:
-                        # Try to use a generic method if available
+                        # Start the streamer if not already started
                         if hasattr(self.streamer, 'start'):
-                            self.streamer.start(handler or self.default_handler)
-                        elif hasattr(self.streamer, 'start_auto'):
-                            self.streamer.start_auto()
+                            self.streamer.start(self.default_handler)
                         
+                        # Add symbol to active subscriptions
+                        self.active_subscriptions.add(symbol)
                         logger.info(f"Started generic streaming for {symbol}")
                     except Exception as e:
                         logger.error(f"Error starting generic streaming for {symbol}: {str(e)}")
                         if self.debug_mode:
                             logger.error(f"Traceback: {traceback.format_exc()}")
-                        return False
-            
-            # Update active subscriptions
-            self.active_subscriptions.update(symbols)
             
             logger.info(f"Started streaming real-time data for symbols: {symbols}")
             return True
@@ -428,21 +419,12 @@ class RealTimeDataStreamer:
             bool: True if successful, False otherwise
         """
         try:
-            if not self.streamer:
-                logger.warning("No active streamer to stop")
-                return False
-            
-            # Stop streaming
-            if hasattr(self.streamer, 'stop'):
+            if self.streamer and hasattr(self.streamer, 'stop'):
                 self.streamer.stop()
-                logger.info("Stopped streaming real-time data")
                 self.active_subscriptions.clear()
+                logger.info("Stopped streaming real-time data")
                 return True
-            else:
-                logger.error("Streamer does not have stop method")
-                return False
+            return False
         except Exception as e:
             logger.error(f"Error stopping real-time data streaming: {str(e)}")
-            if self.debug_mode:
-                logger.error(f"Traceback: {traceback.format_exc()}")
             return False

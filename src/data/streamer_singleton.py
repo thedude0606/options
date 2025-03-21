@@ -7,6 +7,7 @@ with proper asyncio event loop handling.
 import logging
 import asyncio
 import threading
+import time
 from src.data.realtime import RealTimeDataStreamer
 
 # Configure logging
@@ -26,6 +27,7 @@ class StreamerSingleton:
     _thread = None
     _running = False
     _client = None
+    _thread_id = None
     
     @classmethod
     def get_instance(cls, client=None):
@@ -72,11 +74,15 @@ class StreamerSingleton:
                 logger.info("Stopping existing streamer thread before starting a new one")
                 cls.reset()
                 
+            # Wait a moment to ensure any previous threads are fully stopped
+            time.sleep(0.5)
+                
             logger.info("Starting streamer in dedicated thread")
             cls._running = True
             cls._thread = threading.Thread(target=cls._run_streamer_loop, daemon=True)
             cls._thread.start()
-            logger.info("Streamer thread started")
+            cls._thread_id = cls._thread.ident
+            logger.info(f"Streamer thread started with ID: {cls._thread_id}")
         except Exception as e:
             logger.error(f"Error starting streamer thread: {str(e)}")
             cls._running = False
@@ -96,7 +102,14 @@ class StreamerSingleton:
             # Initialize the streamer's client connection in this loop
             if hasattr(cls._streamer, 'initialize_streamer'):
                 logger.info("Initializing streamer in dedicated event loop")
-                loop.run_until_complete(cls._async_initialize_streamer())
+                try:
+                    # Use run_until_complete with a timeout to prevent hanging
+                    future = asyncio.ensure_future(cls._async_initialize_streamer(), loop=loop)
+                    loop.run_until_complete(asyncio.wait_for(future, timeout=10.0))
+                except asyncio.TimeoutError:
+                    logger.error("Timeout while initializing streamer")
+                except Exception as e:
+                    logger.error(f"Error initializing streamer in event loop: {str(e)}")
             
             # Keep the loop running to handle streaming events
             logger.info("Running streamer event loop")
@@ -107,7 +120,19 @@ class StreamerSingleton:
             logger.info("Streamer thread exiting")
             cls._running = False
             if cls._event_loop:
-                cls._event_loop.close()
+                try:
+                    # Close all running tasks
+                    pending = asyncio.all_tasks(loop=cls._event_loop)
+                    for task in pending:
+                        task.cancel()
+                    
+                    # Run the event loop until all tasks are cancelled
+                    if pending:
+                        cls._event_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    
+                    cls._event_loop.close()
+                except Exception as e:
+                    logger.error(f"Error closing event loop: {str(e)}")
     
     @classmethod
     async def _async_initialize_streamer(cls):
@@ -122,6 +147,10 @@ class StreamerSingleton:
                     # Register the default handler
                     await streamer.start(cls._streamer.default_handler)
                     logger.info("Streamer initialized successfully in dedicated event loop")
+                else:
+                    logger.error("Streamer does not have start method")
+            else:
+                logger.error("Streamer does not have get_streamer method")
         except Exception as e:
             logger.error(f"Error initializing streamer: {str(e)}")
     
@@ -156,21 +185,41 @@ class StreamerSingleton:
         """
         try:
             with cls._lock:
+                # First stop the streamer
                 if cls._streamer is not None:
-                    cls._streamer.stop_streaming()
+                    try:
+                        cls._streamer.stop_streaming()
+                    except Exception as e:
+                        logger.error(f"Error stopping streamer: {str(e)}")
                 
+                # Then stop the event loop
                 if cls._event_loop and cls._event_loop.is_running():
-                    cls._event_loop.stop()
+                    try:
+                        # Use call_soon_threadsafe to stop the loop from another thread
+                        cls._event_loop.call_soon_threadsafe(cls._event_loop.stop)
+                    except Exception as e:
+                        logger.error(f"Error stopping event loop: {str(e)}")
                 
+                # Wait for the thread to join
                 if cls._thread and cls._thread.is_alive():
-                    cls._thread.join(timeout=1.0)
+                    try:
+                        cls._thread.join(timeout=2.0)
+                        if cls._thread.is_alive():
+                            logger.warning("Thread did not terminate within timeout")
+                    except Exception as e:
+                        logger.error(f"Error joining thread: {str(e)}")
                 
+                # Reset all class variables
                 cls._instance = None
                 cls._streamer = None
                 cls._initialized = False
                 cls._running = False
                 cls._event_loop = None
                 cls._thread = None
+                cls._thread_id = None
+                
+                # Wait a moment to ensure resources are released
+                time.sleep(0.5)
                 
                 logger.info("StreamerSingleton has been reset")
                 return True
@@ -215,8 +264,28 @@ class StreamerSingleton:
                 for data_type, handler in handlers.items():
                     cls._streamer.register_handler(data_type, handler)
             
-            # The actual streaming is handled by the dedicated thread
-            return True
+            # Start streaming in the dedicated thread
+            if cls._running and cls._thread and cls._thread.is_alive():
+                # The actual streaming is handled by the dedicated thread
+                # We need to pass the symbols to the streamer
+                if symbols:
+                    # Call the streamer's start_streaming method
+                    return cls._streamer.start_streaming(symbols=symbols, fields=fields)
+                return True
+            else:
+                # If thread is not running, try to restart it
+                logger.warning("Streamer thread not running, attempting to restart")
+                cls._start_streamer_thread()
+                # Wait a moment for the thread to start
+                time.sleep(1.0)
+                if cls._running and cls._thread and cls._thread.is_alive():
+                    # Now try to start streaming
+                    if symbols:
+                        return cls._streamer.start_streaming(symbols=symbols, fields=fields)
+                    return True
+                else:
+                    logger.error("Failed to restart streamer thread")
+                    return False
         return False
     
     @classmethod
